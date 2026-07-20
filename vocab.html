@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Vocab. 极简单词本 - PWA云端同步版">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Vocab. 单词本</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0f0f1a;--card:#1a1a2e;--card-hover:#222240;--accent:#6c63ff;--accent2:#4fc3f7;
+--text:#e0e0e0;--text-dim:#888;--border:#2a2a4a;--danger:#ff5252;--success:#69f0ae;
+--tag-n:#e57373;--tag-v:#64b5f6;--tag-adj:#81c784;--tag-adv:#ffb74d;--tag-prep:#ba68c8;--tag-other:#90a4ae;
+}
+html{font-size:16px;scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px;overflow-x:hidden}
+/* Header */
+.header{position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(15,15,26,0.85);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:all .3s}
+.header .logo{font-size:1.25rem;font-weight:700;letter-spacing:1px;color:var(--accent);white-space:nowrap}
+.header .stats{font-size:.75rem;color:var(--text-dim);text-align:center;flex:1;line-height:1.4}
+.header .actions{display:flex;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border:none;border-radius:8px;font-size:.8rem;cursor:pointer;transition:all .2s;font-weight:500;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#5a52e0}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--text-dim)}
+.btn-danger{background:var(--danger);color:#fff;padding:4px 10px;font-size:.75rem}.btn-danger:hover{background:#e04040}
+.btn-sm{padding:4px 10px;font-size:.75rem}
+.btn-icon{width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;transition:all .2s;font-size:1rem}
+.btn-icon:hover{background:var(--card-hover);border-color:var(--accent)}
+/* Input Area */
+.input-area{background:var(--card);border:1px solid var(--border);border-radius:12px;margin:12px 16px;padding:16px;transition:all .3s}
+.input-area.collapsed{max-height:0;padding:0;margin:0;border:none;overflow:hidden;opacity:0}
+.input-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.input-row:last-child{margin-bottom:0}
+.input-area input,.input-area select{
+background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:.9rem;outline:none;transition:border .2s
+}
+.input-area input:focus,.input-area select:focus{border-color:var(--accent)}
+.input-area input[type=text]{flex:1;min-width:120px}
+.input-area select{width:90px;cursor:pointer;appearance:none;-webkit-appearance:none;background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center}
+.meaning-input-wrap{display:flex;gap:8px;align-items:center;flex:1;min-width:0}
+.meaning-input-wrap select{width:90px;flex-shrink:0}
+.meaning-input-wrap input{flex:1;min-width:80px}
+.add-meaning-btn{width:32px;height:32px;border-radius:50%;border:1px dashed var(--border);background:transparent;color:var(--accent);font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.add-meaning-btn:hover{border-color:var(--accent);background:rgba(108,99,255,0.1)}
+.remove-meaning-btn{width:24px;height:24px;border:none;background:transparent;color:var(--danger);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all .2s;flex-shrink:0;opacity:0.6}
+.remove-meaning-btn:hover{opacity:1;background:rgba(255,82,82,0.1)}
+.meaning-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+/* Autocomplete */
+.autocomplete-box{position:relative}
+.suggestions{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:50;display:none;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+.suggestions.active{display:block;animation:slideDown .15s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.suggestion-item{padding:8px 12px;cursor:pointer;font-size:.85rem;display:flex;justify-content:space-between;align-items:center;transition:background .1s}
+.suggestion-item:hover,.suggestion-item.active{background:var(--card-hover)}
+.suggestion-item .word-text{color:var(--text)}
+.suggestion-item .word-pos{color:var(--text-dim);font-size:.75rem}
+/* Word List */
+.word-list{max-width:800px;margin:0 auto;padding:0 16px}
+.word-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;transition:all .25s;animation:cardIn .3s ease}
+.word-card:hover{border-color:rgba(108,99,255,0.3)}
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.word-card .card-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.word-card .word-text{font-size:1.05rem;font-weight:600;color:#fff;cursor:pointer;user-select:none}
+.word-card .pos-tags{display:flex;gap:4px;flex-wrap:wrap}
+.pos-tag{font-size:.65rem;padding:2px 8px;border-radius:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.pos-tag.n{background:rgba(229,115,115,0.2);color:var(--tag-n)}
+.pos-tag.v{background:rgba(100,181,246,0.2);color:var(--tag-v)}
+.pos-tag.adj{background:rgba(129,199,132,0.2);color:var(--tag-adj)}
+.pos-tag.adv{background:rgba(255,183,77,0.2);color:var(--tag-adv)}
+.pos-tag.prep{background:rgba(186,104,200,0.2);color:var(--tag-prep)}
+.pos-tag.other{background:rgba(144,164,174,0.2);color:var(--tag-other)}
+.word-card .card-actions{display:flex;gap:4px;opacity:0;transition:opacity .2s}
+.word-card:hover .card-actions{opacity:1}
+.word-card .delete-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--danger);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.word-card .delete-btn:hover{background:rgba(255,82,82,0.15);border-color:var(--danger)}
+.word-card .meanings{margin-left:4px}
+.word-card .meaning-item{display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:.85rem;line-height:1.5}
+.word-card .meaning-item .pos-label{font-weight:600;font-size:.75rem;min-width:40px}
+.word-card .meaning-item .meaning-text{color:var(--text)}
+.word-card .meaning-item .meaning-text.hidden{color:var(--border);user-select:none}
+/* Study mode */
+.study-mode .meaning-text.hidden{visibility:hidden}
+.study-mode .input-area.collapsed{display:none}
+/* Pagination */
+.pagination{display:flex;justify-content:center;align-items:center;gap:4px;padding:16px;flex-wrap:wrap}
+.pagination .page-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.pagination .page-btn:hover{border-color:var(--accent)}
+.pagination .page-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pagination .page-btn.ellipsis{width:auto;padding:0 8px;cursor:default;border:none;background:transparent;color:var(--text-dim)}
+/* Modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
+.modal-overlay.active{display:flex;animation:fadeIn .2s}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:420px;width:100%;animation:scaleIn .2s ease}
+@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.modal h3{font-size:1rem;margin-bottom:8px;color:#fff}
+.modal p{font-size:.85rem;color:var(--text-dim);margin-bottom:16px;line-height:1.5}
+.modal .modal-actions{display:flex;gap:8px;flex-wrap:wrap}
+.modal .modal-actions .btn{flex:1;justify-content:center;min-width:100px}
+/* Toast */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--accent);color:var(--text);padding:10px 20px;border-radius:10px;font-size:.85rem;z-index:300;display:none;box-shadow:0 4px 20px rgba(108,99,255,0.3);animation:slideUp .3s ease}
+.toast.active{display:block}
+@keyframes slideUp{from{opacity:0;transform:translate(-50%,20px)}to{opacity:1;transform:translate(-50%,0)}}
+/* Auth Modal */
+.auth-form{display:flex;flex-direction:column;gap:10px}
+.auth-form input{padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem;outline:none}
+.auth-form input:focus{border-color:var(--accent)}
+.auth-form .btn{margin-top:4px}
+.auth-toggle{text-align:center;font-size:.8rem;color:var(--text-dim);margin-top:8px}
+.auth-toggle a{color:var(--accent);cursor:pointer;text-decoration:none}
+.auth-toggle a:hover{text-decoration:underline}
+/* Loading */
+.loading{text-align:center;padding:40px;color:var(--text-dim);font-size:.9rem}
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Sync indicator */
+.sync-indicator{font-size:.7rem;color:var(--text-dim);display:flex;align-items:center;gap:4px}
+.sync-indicator.syncing .spinner{display:inline-block}
+.sync-indicator .spinner{display:none}
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+/* Empty state */
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-dim)}
+.empty-state .icon{font-size:3rem;margin-bottom:12px;opacity:0.5}
+/* Search Bar */
+.search-bar{display:flex;gap:8px;padding:8px 16px;align-items:center;max-width:832px;margin:0 auto}
+.search-bar input{flex:1;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:.85rem;outline:none;transition:border .2s}
+.search-bar input:focus{border-color:var(--accent)}
+.search-bar input::placeholder{color:var(--text-dim)}
+/* Responsive */
+@media(max-width:480px){
+.header{padding:10px 12px}
+.header .logo{font-size:1rem}
+.input-area{margin:8px 12px;padding:12px}
+.word-list{padding:0 12px}
+.word-card{padding:12px}
+.modal{padding:20px}
+.input-row{flex-wrap:wrap}
+.search-bar{padding:6px 12px;gap:6px}
+.search-bar input{padding:6px 10px;font-size:.8rem}
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header" id="header">
+  <div class="logo">Vocab.</div>
+  <div class="stats">
+    <div id="statsText">共 <b id="totalCount">0</b> 条记录 · 第 <b id="currentPage">1</b>/<b id="totalPages">1</b> 页</div>
+    <div class="sync-indicator" id="syncIndicator">
+      <span class="spinner"></span>
+      <span id="syncText">已离线</span>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-ghost btn-sm" id="authBtn" onclick="toggleAuthModal()">登录</button>
+    <button class="btn btn-ghost btn-sm" id="modeToggle" onclick="toggleMode()">背单词</button>
+    <button class="btn btn-icon" id="addToggle" onclick="toggleInput()" title="添加单词">＋</button>
+  </div>
+</div>
+<!-- Search Bar -->
+<div class="search-bar" id="searchBar">
+  <input type="text" id="searchInput" placeholder="搜索单词..." oninput="doSearch()">
+  <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()" title="导入">📥</button>
+  <button class="btn btn-ghost btn-sm" onclick="exportData()" title="导出">📤</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this.files[0]);this.value=''">
+</div>
+</div>
+
+<!-- Input Area -->
+<div class="input-area" id="inputArea">
+  <div class="input-row autocomplete-box">
+    <input type="text" id="wordInput" placeholder="输入单词..." autocomplete="off" spellcheck="false">
+    <div class="suggestions" id="suggestions"></div>
+  </div>
+  <div id="meaningsContainer">
+    <div class="meaning-row">
+      <div class="meaning-input-wrap">
+        <select id="posSelect_0">
+          <option value="n.">n.</option>
+          <option value="v.">v.</option>
+          <option value="adj.">adj.</option>
+          <option value="adv.">adv.</option>
+          <option value="prep.">prep.</option>
+          <option value="other">其他</option>
+        </select>
+        <input type="text" id="meaningInput_0" placeholder="输入释义...">
+      </div>
+      <button class="remove-meaning-btn" onclick="removeMeaning(0)" title="移除">×</button>
+    </div>
+  </div>
+  <div class="input-row" style="margin-top:8px">
+    <button class="add-meaning-btn" onclick="addMeaningRow()" title="添加词性释义">＋</button>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-sm" onclick="clearInput()">清空</button>
+    <button class="btn btn-primary btn-sm" onclick="addWord()">添加单词</button>
+  </div>
+</div>
+
+<!-- Word List -->
+<div class="word-list" id="wordList">
+  <div class="empty-state" id="emptyState">
+    <div class="icon">📖</div>
+    <p>还没有单词，开始添加吧</p>
+  </div>
+</div>
+
+<!-- Pagination -->
+<div class="pagination" id="pagination"></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <h3 id="authTitle">登录</h3>
+    <div class="auth-form" id="loginForm">
+      <input type="email" id="authEmail" placeholder="邮箱" autocomplete="email">
+      <input type="password" id="authPassword" placeholder="密码" autocomplete="current-password">
+      <button class="btn btn-primary" onclick="doLogin()">登录</button>
+      <div class="auth-toggle">没有账号？<a onclick="showSignup()">注册</a></div>
+    </div>
+    <div class="auth-form" id="signupForm" style="display:none">
+      <input type="email" id="signupEmail" placeholder="邮箱" autocomplete="email">
+      <input type="password" id="signupPassword" placeholder="密码（至少6位）" autocomplete="new-password">
+      <button class="btn btn-primary" onclick="doSignup()">注册</button>
+      <div class="auth-toggle">已有账号？<a onclick="showLogin()">登录</a></div>
+    </div>
+    <div style="text-align:center;margin-top:12px">
+      <button class="btn btn-ghost btn-sm" onclick="toggleAuthModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate Modal -->
+<div class="modal-overlay" id="dupModal">
+  <div class="modal">
+    <h3>⚠️ 单词已存在</h3>
+    <p id="dupMessage"></p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="dupFillBtn" onclick="dupFill()">自动填充</button>
+      <button class="btn btn-danger" id="dupReplaceBtn" onclick="dupReplace()">删旧留新</button>
+      <button class="btn btn-ghost" onclick="dupCancel()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <h3>确认删除</h3>
+    <p id="deleteMessage"></p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="confirmDelete()">删除</button>
+      <button class="btn btn-ghost" onclick="cancelDelete()">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ========== CONFIG ==========
+const SUPABASE_URL = '';   // ← 你的 Supabase 项目 URL
+const SUPABASE_ANON = '';  // ← 你的 Supabase anon key
+
+// ========== STATE ==========
+let supabase = null;
+let words = [];           // local cache: { id, word, meanings:[{pos, meaning}], created_at }
+let filteredWords = [];   // after search filter
+let currentPage = 1;
+const PAGE_SIZE = 25;
+let studyMode = false;
+let inputVisible = true;
+let meaningCount = 1;
+let currentSuggestionIndex = -1;
+let deleteTargetId = null;
+let dupTargetWord = null;
+
+// ========== INIT ==========
+async function init() {
+  loadLocal();
+  initSupabase();
+  render();
+  setupWordInputEvents();
+  registerSW();
+}
+
+function initSupabase() {
+  if (SUPABASE_URL && SUPABASE_ANON && window.supabase) {
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+        auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
+      });
+      supabase.auth.onAuthStateChange((event, session) => {
+        updateAuthUI(!!session);
+        if (session) { syncFromCloud(); syncAllToCloud(); }
+      });
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        updateAuthUI(!!session);
+        if (session) { syncFromCloud(); syncAllToCloud(); }
+      });
+    } catch(e) { console.warn('Supabase init failed:', e); }
+  }
+}
+
+function updateAuthUI(loggedIn) {
+  const btn = document.getElementById('authBtn');
+  const ind = document.getElementById('syncIndicator');
+  const txt = document.getElementById('syncText');
+  if (loggedIn) {
+    btn.textContent = '同步';
+    btn.onclick = () => syncFromCloud();
+    txt.textContent = '云端已连接';
+    ind.classList.remove('syncing');
+  } else {
+    btn.textContent = '登录';
+    btn.onclick = () => toggleAuthModal();
+    txt.textContent = '已离线';
+  }
+}
+
+// ========== LOCAL STORAGE ==========
+function loadLocal() {
+  try { words = JSON.parse(localStorage.getItem('vocab_words') || '[]'); } catch(e) { words = []; }
+}
+function saveLocal() {
+  localStorage.setItem('vocab_words', JSON.stringify(words));
+}
+
+// ========== CLOUD SYNC ==========
+async function syncFromCloud() {
+  if (!supabase) return;
+  const ind = document.getElementById('syncIndicator');
+  const txt = document.getElementById('syncText');
+  ind.classList.add('syncing');
+  txt.textContent = '同步中...';
+  try {
+    const { data, error } = await supabase.from('vocab_words').select('*').order('created_at', { ascending: true });
+    if (error) throw error;
+    // Merge: cloud wins for conflicts, but keep local-only words
+    const cloudMap = new Map();
+    (data || []).forEach(w => cloudMap.set(w.id, w));
+    const localMap = new Map();
+    words.forEach(w => localMap.set(w.id, w));
+    // Use cloud version for conflicts
+    const merged = [];
+    const seen = new Set();
+    // First add all cloud words
+    for (const w of (data || [])) {
+      merged.push({ id: w.id, word: w.word, meanings: w.meanings || [], created_at: w.created_at, _synced: true });
+      seen.add(w.id);
+    }
+    // Add local-only words not in cloud
+    for (const w of words) {
+      if (!seen.has(w.id)) {
+        merged.push(w);
+        seen.add(w.id);
+      }
+    }
+    words = merged;
+    saveLocal();
+    render();
+    txt.textContent = '同步完成';
+    ind.classList.remove('syncing');
+    setTimeout(() => { txt.textContent = '云端已连接'; }, 2000);
+  } catch(e) {
+    txt.textContent = '同步失败';
+    ind.classList.remove('syncing');
+    console.error('Sync error:', e);
+  }
+}
+
+async function syncToCloud(word) {
+  if (!supabase) return;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) return;
+    const { data, error } = await supabase.from('vocab_words').upsert({
+      id: word.id,
+      user_id: sessionData.session.user.id,
+      word: word.word,
+      meanings: word.meanings,
+      created_at: word.created_at
+    }, { onConflict: 'id' }).select().single();
+    if (!error && data) {
+      word._synced = true;
+      const idx = words.findIndex(w => w.id === word.id);
+      if (idx >= 0) { words[idx] = { ...data, _synced: true }; saveLocal(); }
+    }
+  } catch(e) { console.warn('Sync to cloud failed:', e); }
+}
+
+async function syncAllToCloud() {
+  if (!supabase) return;
+  const unsynced = words.filter(w => !w._synced);
+  for (const w of unsynced) {
+    await syncToCloud(w);
+  }
+}
+
+async function deleteFromCloud(id) {
+  if (!supabase) return;
+  try { await supabase.from('vocab_words').delete().eq('id', id); } catch(e) {}
+}
+
+// ========== AUTH ==========
+function toggleAuthModal() {
+  document.getElementById('authModal').classList.toggle('active');
+}
+function showSignup() {
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('signupForm').style.display = 'flex';
+  document.getElementById('authTitle').textContent = '注册';
+}
+function showLogin() {
+  document.getElementById('signupForm').style.display = 'none';
+  document.getElementById('loginForm').style.display = 'flex';
+  document.getElementById('authTitle').textContent = '登录';
+}
+async function doSignup() {
+  const email = document.getElementById('signupEmail').value.trim();
+  const pass = document.getElementById('signupPassword').value;
+  if (!email || !pass) return showToast('请输入邮箱和密码');
+  if (pass.length < 6) return showToast('密码至少6位');
+  const { error } = await supabase.auth.signUp({ email, password: pass });
+  if (error) return showToast(error.message);
+  showToast('注册成功，请登录');
+  showLogin();
+}
+async function doLogin() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass = document.getElementById('authPassword').value;
+  if (!email || !pass) return showToast('请输入邮箱和密码');
+  const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+  if (error) return showToast(error.message);
+  toggleAuthModal();
+  showToast('登录成功');
+}
+
+// ========== INPUT ==========
+function toggleInput() {
+  inputVisible = !inputVisible;
+  document.getElementById('inputArea').classList.toggle('collapsed', !inputVisible);
+}
+function clearInput() {
+  document.getElementById('wordInput').value = '';
+  document.getElementById('meaningsContainer').innerHTML = '';
+  meaningCount = 0;
+  addMeaningRow();
+  document.getElementById('suggestions').classList.remove('active');
+}
+function addMeaningRow() {
+  const idx = meaningCount++;
+  const html = `
+    <div class="meaning-row" id="meaningRow_${idx}">
+      <div class="meaning-input-wrap">
+        <select id="posSelect_${idx}">
+          <option value="n.">n.</option>
+          <option value="v.">v.</option>
+          <option value="adj.">adj.</option>
+          <option value="adv.">adv.</option>
+          <option value="prep.">prep.</option>
+          <option value="other">其他</option>
+        </select>
+        <input type="text" id="meaningInput_${idx}" placeholder="输入释义...">
+      </div>
+      <button class="remove-meaning-btn" onclick="removeMeaning(${idx})" title="移除">×</button>
+    </div>`;
+  document.getElementById('meaningsContainer').insertAdjacentHTML('beforeend', html);
+  document.getElementById(`meaningInput_${idx}`).focus();
+}
+function removeMeaning(idx) {
+  const el = document.getElementById(`meaningRow_${idx}`);
+  if (el) el.remove();
+  // Check if any meanings remain
+  if (document.querySelectorAll('.meaning-row').length === 0) addMeaningRow();
+}
+
+function getInputData() {
+  const word = document.getElementById('wordInput').value.trim().toLowerCase();
+  const meanings = [];
+  document.querySelectorAll('.meaning-row').forEach(row => {
+    const idx = row.id.split('_')[1];
+    const pos = document.getElementById(`posSelect_${idx}`).value;
+    const meaning = document.getElementById(`meaningInput_${idx}`).value.trim();
+    if (meaning) meanings.push({ pos, meaning });
+  });
+  return { word, meanings };
+}
+
+// ========== AUTOCOMPLETE ==========
+function setupWordInputEvents() {
+  const input = document.getElementById('wordInput');
+  const box = document.getElementById('suggestions');
+  input.addEventListener('input', () => {
+    const val = input.value.trim().toLowerCase();
+    if (!val) { box.classList.remove('active'); return; }
+    const matches = words.filter(w => w.word.startsWith(val)).slice(0, 8);
+    if (matches.length === 0) { box.classList.remove('active'); return; }
+    box.innerHTML = matches.map((w, i) => {
+      const posStr = w.meanings.map(m => m.pos).join(', ');
+      return `<div class="suggestion-item" data-index="${i}" data-word="${w.word}">
+        <span class="word-text">${w.word}</span>
+        <span class="word-pos">${posStr}</span>
+      </div>`;
+    }).join('');
+    box.classList.add('active');
+    currentSuggestionIndex = -1;
+  });
+  input.addEventListener('keydown', (e) => {
+    const items = box.querySelectorAll('.suggestion-item');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      currentSuggestionIndex = Math.min(currentSuggestionIndex + 1, items.length - 1);
+      updateSuggestionHighlight(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      currentSuggestionIndex = Math.max(currentSuggestionIndex - 1, -1);
+      updateSuggestionHighlight(items);
+    } else if (e.key === 'Enter' && currentSuggestionIndex >= 0) {
+      e.preventDefault();
+      items[currentSuggestionIndex].click();
+    } else if (e.key === 'Escape') {
+      box.classList.remove('active');
+    } else if (e.key === 'Enter') {
+      // Allow default form submission via button
+    }
+  });
+  box.addEventListener('click', (e) => {
+    const item = e.target.closest('.suggestion-item');
+    if (item) {
+      input.value = item.dataset.word;
+      box.classList.remove('active');
+      // Focus first meaning input
+      const first = document.querySelector('.meaning-row input[type=text]');
+      if (first) first.focus();
+    }
+  });
+  // Close suggestions on click outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-box')) box.classList.remove('active');
+  });
+}
+function updateSuggestionHighlight(items) {
+  items.forEach((item, i) => item.classList.toggle('active', i === currentSuggestionIndex));
+}
+
+// ========== ADD WORD ==========
+function addWord() {
+  const { word, meanings } = getInputData();
+  if (!word) return showToast('请输入单词');
+  if (meanings.length === 0) return showToast('请至少添加一个释义');
+
+  // Check duplicate
+  const existing = words.find(w => w.word === word);
+  if (existing) {
+    showDupModal(word, existing);
+    return;
+  }
+  commitAdd(word, meanings);
+}
+
+function commitAdd(word, meanings, replaceId) {
+  const id = replaceId || genId();
+  const now = new Date().toISOString();
+  const entry = { id, word, meanings, created_at: now, _synced: false };
+
+  if (replaceId) {
+    const idx = words.findIndex(w => w.id === replaceId);
+    if (idx >= 0) words[idx] = entry;
+  } else {
+    words.push(entry);
+  }
+
+  saveLocal();
+  if (supabase && supabase.auth.getSession) {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) syncToCloud(entry);
+    });
+  }
+  clearInput();
+  render();
+  // Scroll to top of current page area
+  document.getElementById('wordList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+}
+
+// ========== DUPLICATE MODAL ==========
+function showDupModal(word, existing) {
+  dupTargetWord = word;
+  const msg = document.getElementById('dupMessage');
+  const posStr = existing.meanings.map(m => `${m.pos} ${m.meaning}`).join('; ');
+  // Find page and index
+  const idx = words.findIndex(w => w.id === existing.id);
+  const page = Math.ceil((idx + 1) / PAGE_SIZE);
+  const pos = (idx % PAGE_SIZE) + 1;
+  msg.innerHTML = `「<b>${word}</b>」已在第 <b>${page}</b> 页第 <b>${pos}</b> 个位置出现过<br>已有释义：${posStr}`;
+  document.getElementById('dupModal').classList.add('active');
+}
+function dupFill() {
+  const { word, meanings } = getInputData();
+  // Fill with existing data
+  const existing = words.find(w => w.word === dupTargetWord);
+  if (existing) {
+    document.getElementById('wordInput').value = existing.word;
+    document.getElementById('meaningsContainer').innerHTML = '';
+    meaningCount = 0;
+    existing.meanings.forEach(m => {
+      addMeaningRow();
+      const idx = meaningCount - 1;
+      document.getElementById(`posSelect_${idx}`).value = m.pos;
+      document.getElementById(`meaningInput_${idx}`).value = m.meaning;
+    });
+  }
+  document.getElementById('dupModal').classList.remove('active');
+}
+function dupReplace() {
+  const { word, meanings } = getInputData();
+  const existing = words.find(w => w.word === dupTargetWord);
+  if (existing) {
+    const oldId = existing.id;
+    // Remove old from cloud
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) deleteFromCloud(oldId);
+      });
+    }
+    commitAdd(word, meanings, oldId);
+  }
+  document.getElementById('dupModal').classList.remove('active');
+}
+function dupCancel() {
+  document.getElementById('dupModal').classList.remove('active');
+  dupTargetWord = null;
+}
+
+// ========== DELETE ==========
+function requestDelete(id) {
+  deleteTargetId = id;
+  const w = words.find(x => x.id === id);
+  document.getElementById('deleteMessage').textContent = `确定要删除「${w.word}」吗？此操作不可撤销。`;
+  document.getElementById('deleteModal').classList.add('active');
+}
+function confirmDelete() {
+  const w = words.find(x => x.id === deleteTargetId);
+  words = words.filter(x => x.id !== deleteTargetId);
+  saveLocal();
+  if (supabase && w) {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) deleteFromCloud(deleteTargetId);
+    });
+  }
+  deleteTargetId = null;
+  document.getElementById('deleteModal').classList.remove('active');
+  render();
+}
+function cancelDelete() {
+  deleteTargetId = null;
+  document.getElementById('deleteModal').classList.remove('active');
+}
+
+// ========== MODE ==========
+function toggleMode() {
+  studyMode = !studyMode;
+  document.body.classList.toggle('study-mode', studyMode);
+  document.getElementById('modeToggle').textContent = studyMode ? '普通模式' : '背单词';
+  if (studyMode) {
+    inputVisible = false;
+    document.getElementById('inputArea').classList.add('collapsed');
+  } else {
+    inputVisible = true;
+    document.getElementById('inputArea').classList.remove('collapsed');
+  }
+}
+
+// ========== RENDER ==========
+function render() {
+  filteredWords = [...words];
+  const totalPages = Math.max(1, Math.ceil(filteredWords.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  // Stats
+  document.getElementById('totalCount').textContent = words.length;
+  document.getElementById('currentPage').textContent = currentPage;
+  document.getElementById('totalPages').textContent = totalPages;
+
+  // Word list
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageWords = filteredWords.slice(start, start + PAGE_SIZE);
+  const container = document.getElementById('wordList');
+
+  if (filteredWords.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📖</div><p>${words.length === 0 ? '还没有单词，开始添加吧' : '没有匹配的单词'}</p></div>`;
+  } else {
+    container.innerHTML = pageWords.map((w, i) => {
+      const globalIdx = start + i + 1;
+      const posTags = w.meanings.map(m => {
+        const cls = m.pos === 'n.' ? 'n' : m.pos === 'v.' ? 'v' : m.pos === 'adj.' ? 'adj' : m.pos === 'adv.' ? 'adv' : m.pos === 'prep.' ? 'prep' : 'other';
+        return `<span class="pos-tag ${cls}">${m.pos}</span>`;
+      }).join('');
+      const meaningsHtml = w.meanings.map(m => {
+        const cls = m.pos === 'n.' ? 'n' : m.pos === 'v.' ? 'v' : m.pos === 'adj.' ? 'adj' : m.pos === 'adv.' ? 'adv' : m.pos === 'prep.' ? 'prep' : 'other';
+        return `<div class="meaning-item">
+          <span class="pos-label" style="color:var(--tag-${cls})">${m.pos}</span>
+          <span class="meaning-text ${studyMode ? 'hidden' : ''}" onclick="toggleMeaning(this)">${escapeHtml(m.meaning)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="word-card" data-id="${w.id}">
+        <div class="card-header">
+          <span class="word-text" onclick="toggleCardMeanings(this)">${escapeHtml(w.word)}</span>
+          <div class="pos-tags">${posTags}</div>
+          <div class="card-actions">
+            <button class="delete-btn" onclick="requestDelete('${w.id}')" title="删除">×</button>
+          </div>
+        </div>
+        <div class="meanings">${meaningsHtml}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Pagination
+  renderPagination(totalPages);
+}
+
+function toggleMeaning(el) {
+  if (studyMode) {
+    el.classList.toggle('hidden');
+  }
+}
+function toggleCardMeanings(el) {
+  if (!studyMode) return;
+  const card = el.closest('.word-card');
+  const texts = card.querySelectorAll('.meaning-text');
+  texts.forEach(t => t.classList.toggle('hidden'));
+}
+
+function renderPagination(totalPages) {
+  const container = document.getElementById('pagination');
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+  let html = '';
+  const maxVisible = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+  let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+  if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
+
+  if (startPage > 1) {
+    html += `<button class="page-btn" onclick="goPage(1)">1</button>`;
+    if (startPage > 2) html += `<span class="page-btn ellipsis">...</span>`;
+  }
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+  }
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) html += `<span class="page-btn ellipsis">...</span>`;
+    html += `<button class="page-btn" onclick="goPage(${totalPages})">${totalPages}</button>`;
+  }
+  container.innerHTML = html;
+}
+function goPage(page) {
+  currentPage = page;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ========== TOAST ==========
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('active');
+  setTimeout(() => t.classList.remove('active'), 2500);
+}
+
+// ========== UTILS ==========
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ========== PWA SERVICE WORKER ==========
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(e => console.log('SW registration failed:', e));
+  }
+}
+
+// ========== EXPORT ==========
+function exportData() {
+  const data = JSON.stringify(words, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vocab_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ========== IMPORT ==========
+// ========== SEARCH ==========
+function doSearch() {
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  if (!query) {
+    filteredWords = [...words];
+  } else {
+    filteredWords = words.filter(w => w.word.includes(query));
+  }
+  currentPage = 1;
+  // Update stats for search
+  const totalPages = Math.max(1, Math.ceil(filteredWords.length / PAGE_SIZE));
+  document.getElementById('totalCount').textContent = words.length;
+  document.getElementById('currentPage').textContent = currentPage;
+  document.getElementById('totalPages').textContent = totalPages;
+  // Re-render word list with filtered results
+  const start = 0;
+  const pageWords = filteredWords.slice(start, PAGE_SIZE);
+  const container = document.getElementById('wordList');
+  if (filteredWords.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>没有匹配的单词</p></div>`;
+  } else {
+    container.innerHTML = pageWords.map((w, i) => {
+      const posTags = w.meanings.map(m => {
+        const cls = m.pos === 'n.' ? 'n' : m.pos === 'v.' ? 'v' : m.pos === 'adj.' ? 'adj' : m.pos === 'adv.' ? 'adv' : m.pos === 'prep.' ? 'prep' : 'other';
+        return `<span class="pos-tag ${cls}">${m.pos}</span>`;
+      }).join('');
+      const meaningsHtml = w.meanings.map(m => {
+        const cls = m.pos === 'n.' ? 'n' : m.pos === 'v.' ? 'v' : m.pos === 'adj.' ? 'adj' : m.pos === 'adv.' ? 'adv' : m.pos === 'prep.' ? 'prep' : 'other';
+        return `<div class="meaning-item">
+          <span class="pos-label" style="color:var(--tag-${cls})">${m.pos}</span>
+          <span class="meaning-text ${studyMode ? 'hidden' : ''}" onclick="toggleMeaning(this)">${escapeHtml(m.meaning)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="word-card" data-id="${w.id}">
+        <div class="card-header">
+          <span class="word-text" onclick="toggleCardMeanings(this)">${escapeHtml(w.word)}</span>
+          <div class="pos-tags">${posTags}</div>
+          <div class="card-actions">
+            <button class="delete-btn" onclick="requestDelete('${w.id}')" title="删除">×</button>
+          </div>
+        </div>
+        <div class="meanings">${meaningsHtml}</div>
+      </div>`;
+    }).join('');
+  }
+  renderPagination(totalPages);
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Invalid format');
+      words = data.map(w => ({ ...w, _synced: false }));
+      saveLocal();
+      render();
+      showToast(`导入了 ${words.length} 条记录`);
+    } catch(err) {
+      showToast('导入失败：文件格式不正确');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Make functions available globally for onclick handlers
+window.toggleAuthModal = toggleAuthModal;
+window.showSignup = showSignup;
+window.showLogin = showLogin;
+window.doSignup = doSignup;
+window.doLogin = doLogin;
+window.toggleInput = toggleInput;
+window.clearInput = clearInput;
+window.addMeaningRow = addMeaningRow;
+window.removeMeaning = removeMeaning;
+window.addWord = addWord;
+window.requestDelete = requestDelete;
+window.confirmDelete = confirmDelete;
+window.cancelDelete = cancelDelete;
+window.toggleMode = toggleMode;
+window.goPage = goPage;
+window.toggleMeaning = toggleMeaning;
+window.toggleCardMeanings = toggleCardMeanings;
+window.dupFill = dupFill;
+window.dupReplace = dupReplace;
+window.dupCancel = dupCancel;
+window.syncFromCloud = syncFromCloud;
+window.syncAllToCloud = syncAllToCloud;
+window.exportData = exportData;
+window.importData = importData;
+
+// ========== START ==========
+init();
+</script>
+</body>
+</html>
